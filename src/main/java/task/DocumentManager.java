@@ -4,9 +4,12 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
-import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * For implement this task focus on clear code, and make this solution as simple readable as possible
@@ -19,6 +22,8 @@ import java.util.Optional;
  */
 public class DocumentManager {
 
+    private final Map<String, Document> documents = new LinkedHashMap<>();
+
     /**
      * Implementation of this method should upsert the document to your storage
      * And generate unique id if it does not exist, don't change [created] field
@@ -27,8 +32,18 @@ public class DocumentManager {
      * @return saved document
      */
     public Document save(Document document) {
-
-        return null;
+        Objects.requireNonNull(document.author, "'author' is required");
+        Objects.requireNonNull(document.title, "'title' is required");
+        Objects.requireNonNull(document.content, "'content' is required");
+        Objects.requireNonNull(document.created, "'created' is required");
+        if (document.id == null) {
+            document.id = UUID.randomUUID().toString();
+        }
+        if (document.author.id == null) {
+            document.author.id = UUID.randomUUID().toString();
+        }
+        documents.put(document.id, document);
+        return document;
     }
 
     /**
@@ -38,8 +53,38 @@ public class DocumentManager {
      * @return list matched documents
      */
     public List<Document> search(SearchRequest request) {
+        return documents.values().stream()
+                .filter(document -> matches(document, request))
+                .toList();
+    }
 
-        return Collections.emptyList();
+    private static boolean matches(Document document, SearchRequest request) {
+        if (request.titlePrefixes != null) {
+            if (request.titlePrefixes.stream().noneMatch(document.title::startsWith)) {
+                return false;
+            }
+        }
+        if (request.containsContents != null) {
+            if (request.containsContents.stream().noneMatch(document.content::contains)) {
+                return false;
+            }
+        }
+        if (request.authorIds != null) {
+            if (!request.authorIds.contains(document.author.id)) {
+                return false;
+            }
+        }
+        if (request.createdFrom != null) {
+            if (document.created.isBefore(request.createdFrom)) {
+                return false;
+            }
+        }
+        if (request.createdTo != null) {
+            if (!document.created.isBefore(request.createdTo)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -49,8 +94,7 @@ public class DocumentManager {
      * @return optional document
      */
     public Optional<Document> findById(String id) {
-
-        return Optional.empty();
+        return Optional.ofNullable(documents.get(id));
     }
 
     @Data
